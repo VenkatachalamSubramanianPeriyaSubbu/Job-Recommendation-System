@@ -1,0 +1,88 @@
+use job_database
+
+// new collection with only California jobs
+db.jooble_jobs_new_collection.aggregate([
+  {
+    $match: {
+      $or: [
+        { location: "California" },
+        { location: "CA" },
+        { location: /California/i },
+        { location: /^CA$/i }
+      ]
+    }
+  },
+  {
+    $out: "california_jobs"
+  }
+])
+
+// most common words in job title
+db.california_jobs.aggregate([
+  {
+    $project: {
+      words: { $split: ["$title", " "] }
+    }
+  },
+  {
+    $unwind: "$words"
+  },
+  {
+    $group: {
+      _id: "$words",
+      count: { $sum: 1 }
+    }
+  },
+  {
+    $match: {
+      count: { $gt: 5 } 
+    }
+  },
+  {
+    $sort: { count: -1 }
+  }
+])
+
+
+// Job type distribution
+db.california_jobs.aggregate([
+  {
+    $match: {
+      type: { $ne: "" }
+    }
+  },
+  {
+    $group: {
+      _id: "$type",
+      count: { $sum: 1 }
+    }
+  },
+  {
+    $sort: { count: -1 }
+  }
+])
+
+
+// Companies with the most job postings
+db.california_jobs.aggregate([
+  {
+    $group: {
+      _id: "$company",
+      jobCount: { $sum: 1 },
+      titles: { $addToSet: "$title" }
+    }
+  },
+  {
+    $sort: { jobCount: -1 }
+  },
+  {
+    $limit: 10
+  }
+])
+
+// Recent jobs
+db.california_jobs.find({
+  date: {
+    $gte: new Date(new Date().setDate(new Date().getDate() - 30))
+  }
+})
